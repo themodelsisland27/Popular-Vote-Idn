@@ -1,0 +1,8 @@
+{
+  "name": "POPULAR VOTE ID",
+  "description": "Platform Voting Digital Multi-Event Profesional & Terpercaya. Your Vote, Your Power.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
