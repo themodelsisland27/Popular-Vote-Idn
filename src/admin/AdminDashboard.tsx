@@ -329,10 +329,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateSectio
             <h3 className="font-extrabold text-slate-900 text-sm">Audit Log Sistem Terkini</h3>
           </div>
           <button
-            onClick={() => onNavigateSection('security')}
+            onClick={() => onNavigateSection('activity-logs')}
             className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
           >
-            Buka Riwayat Lengkap
+            Buka Activity Logs Lengkap
           </button>
         </div>
 

@@ -18,7 +18,8 @@ import {
   Menu,
   X,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  History,
 } from 'lucide-react';
 import { AdminUser } from '../types/index.ts';
 
@@ -48,6 +49,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     { id: 'candidates', label: 'Kelola Peserta', icon: Users },
     { id: 'packages', label: 'Paket Vote', icon: Package },
     { id: 'votes', label: 'Suara & Audit Log', icon: Vote },
+    { id: 'activity-logs', label: 'Activity Logs', icon: History },
     { id: 'transactions', label: 'Transaksi & Bayar', icon: Receipt },
     { id: 'winners', label: 'Kelola Pemenang', icon: Trophy },
     { id: 'reports', label: 'Laporan & Ekspor', icon: BarChart3 },

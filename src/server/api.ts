@@ -1538,6 +1538,15 @@ apiRouter.post('/admin/categories', requireAdmin, async (req: AdminAuthRequest, 
       })
       .returning();
 
+    await logAdminAction({
+      adminEmail: req.admin?.email || 'admin@popularvote.id',
+      action: 'CREATE_CATEGORY',
+      targetEntity: 'categories',
+      targetId: newCat.id,
+      details: `Kategori '${newCat.name}' dibuat untuk Event ID ${newCat.eventId}`,
+      ipAddress: req.ip,
+    });
+
     res.json(newCat);
   } catch (err: any) {
     res.status(500).json({ error: 'Gagal menambahkan kategori' });
@@ -1560,6 +1569,16 @@ apiRouter.put('/admin/categories/:id', requireAdmin, async (req: AdminAuthReques
     if (!updated) {
       return res.status(404).json({ error: 'Kategori tidak ditemukan' });
     }
+
+    await logAdminAction({
+      adminEmail: req.admin?.email || 'admin@popularvote.id',
+      action: 'UPDATE_CATEGORY',
+      targetEntity: 'categories',
+      targetId: updated.id,
+      details: `Kategori '${updated.name}' (ID ${updated.id}) berhasil diperbarui`,
+      ipAddress: req.ip,
+    });
+
     res.json(updated);
   } catch (err: any) {
     console.error('Error updating category:', err);
@@ -1571,6 +1590,16 @@ apiRouter.delete('/admin/categories/:id', requireAdmin, async (req: AdminAuthReq
   try {
     const id = Number(req.params.id);
     await db.delete(eventCategories).where(eq(eventCategories.id, id));
+
+    await logAdminAction({
+      adminEmail: req.admin?.email || 'admin@popularvote.id',
+      action: 'DELETE_CATEGORY',
+      targetEntity: 'categories',
+      targetId: id,
+      details: `Kategori ID ${id} berhasil dihapus dari sistem`,
+      ipAddress: req.ip,
+    });
+
     res.json({ success: true, message: 'Kategori berhasil dihapus' });
   } catch (err: any) {
     res.status(500).json({ error: 'Gagal menghapus kategori' });
@@ -1834,6 +1863,15 @@ apiRouter.post('/admin/vote-packages', requireAdmin, async (req: AdminAuthReques
       })
       .returning();
 
+    await logAdminAction({
+      adminEmail: req.admin?.email || 'admin@popularvote.id',
+      action: 'CREATE_VOTE_PACKAGE',
+      targetEntity: 'vote_packages',
+      targetId: newPkg.id,
+      details: `Paket '${newPkg.name}' (${newPkg.votesCount} Suara, Rp ${newPkg.price.toLocaleString('id-ID')}) dibuat untuk Event ID ${newPkg.eventId}`,
+      ipAddress: req.ip,
+    });
+
     res.json(newPkg);
   } catch (err: any) {
     res.status(500).json({ error: 'Gagal membuat paket vote' });
@@ -1870,6 +1908,16 @@ apiRouter.put('/admin/vote-packages/:id', requireAdmin, async (req: AdminAuthReq
     if (!updated) {
       return res.status(404).json({ error: 'Paket vote tidak ditemukan' });
     }
+
+    await logAdminAction({
+      adminEmail: req.admin?.email || 'admin@popularvote.id',
+      action: 'UPDATE_VOTE_PACKAGE',
+      targetEntity: 'vote_packages',
+      targetId: updated.id,
+      details: `Paket '${updated.name}' (ID ${updated.id}) berhasil diperbarui`,
+      ipAddress: req.ip,
+    });
+
     res.json(updated);
   } catch (err: any) {
     console.error('Error updating vote package:', err);
@@ -1881,6 +1929,16 @@ apiRouter.delete('/admin/vote-packages/:id', requireAdmin, async (req: AdminAuth
   try {
     const id = Number(req.params.id);
     await db.delete(votePackages).where(eq(votePackages.id, id));
+
+    await logAdminAction({
+      adminEmail: req.admin?.email || 'admin@popularvote.id',
+      action: 'DELETE_VOTE_PACKAGE',
+      targetEntity: 'vote_packages',
+      targetId: id,
+      details: `Paket vote ID ${id} berhasil dihapus dari sistem`,
+      ipAddress: req.ip,
+    });
+
     res.json({ success: true, message: 'Paket vote berhasil dihapus' });
   } catch (err: any) {
     res.status(500).json({ error: 'Gagal menghapus paket vote' });
@@ -2516,12 +2574,126 @@ apiRouter.put('/admin/settings', requireAdmin, async (req: AdminAuthRequest, res
   }
 });
 
-// 24. Audit Logs
+// 24. Audit & Activity Logs
 apiRouter.get('/admin/audit-logs', requireAdmin, async (req: AdminAuthRequest, res: Response) => {
   try {
     const list = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
     res.json(list);
   } catch (err: any) {
     res.status(500).json({ error: 'Gagal memuat log audit' });
+  }
+});
+
+// Detailed Activity Logs with Environment Sync Diagnostics & Real-Time Monitoring
+apiRouter.get('/admin/activity-logs', requireAdmin, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const { search, entity, action, limit = '100' } = req.query;
+    const maxLimit = Math.min(Math.max(parseInt(limit as string) || 100, 1), 500);
+
+    const conditions = [];
+
+    if (entity && typeof entity === 'string' && entity !== 'ALL') {
+      conditions.push(eq(auditLogs.targetEntity, entity));
+    }
+
+    if (action && typeof action === 'string' && action !== 'ALL') {
+      conditions.push(eq(auditLogs.action, action));
+    }
+
+    if (search && typeof search === 'string' && search.trim() !== '') {
+      const q = `%${search.trim().toLowerCase()}%`;
+      conditions.push(
+        or(
+          ilike(auditLogs.action, q),
+          ilike(auditLogs.targetEntity, q),
+          ilike(auditLogs.details, q),
+          ilike(auditLogs.adminEmail, q)
+        )
+      );
+    }
+
+    let query = db.select().from(auditLogs);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    const list = await query.orderBy(desc(auditLogs.createdAt)).limit(maxLimit);
+
+    // Diagnostic information about current environment and database connection
+    const isCloudSqlSocket = !!process.env.SQL_HOST;
+    const dbHostType = isCloudSqlSocket
+      ? 'Google Cloud SQL (Unix Domain Socket)'
+      : (process.env.DATABASE_URL ? (process.env.DATABASE_URL.includes('neon') ? 'Neon PostgreSQL' : (process.env.DATABASE_URL.includes('supabase') ? 'Supabase PostgreSQL' : 'External PostgreSQL')) : 'Direct DB');
+
+    const environment = {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      dbHostType,
+      dbName: process.env.SQL_DB_NAME || 'cloud_sql_development_database',
+      serverTime: new Date().toISOString(),
+      appUrl: `${req.protocol}://${req.get('host') || 'localhost:3000'}`,
+      uptimeSeconds: Math.floor(process.uptime()),
+    };
+
+    res.json({
+      environment,
+      logs: list,
+      total: list.length,
+    });
+  } catch (err: any) {
+    console.error('Error fetching activity logs:', err);
+    res.status(500).json({ error: 'Gagal memuat log aktivitas' });
+  }
+});
+
+// Environment Sync Test Ping: writes a real-time test event into the database to verify DB sync
+apiRouter.post('/admin/activity-logs/ping', requireAdmin, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const adminEmail = req.admin?.email || 'admin@popularvote.id';
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+    const note = (req.body?.note || 'Sync Ping Test').trim();
+
+    await logAdminAction({
+      adminEmail,
+      action: 'ENVIRONMENT_SYNC_PING',
+      targetEntity: 'SYSTEM_SYNC',
+      targetId: 'sync-test',
+      details: `[Tes Sinkronisasi Real-Time] Host: ${req.get('host') || 'unknown'}, IP: ${clientIp}, Catatan: "${note}"`,
+      ipAddress: clientIp,
+    });
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      message: 'Ping sinkronisasi berhasil dicatat ke database secara real-time!',
+    });
+  } catch (err: any) {
+    console.error('Ping test error:', err);
+    res.status(500).json({ error: 'Gagal melakukan tes sinkronisasi database' });
+  }
+});
+
+// Clear Activity Logs (except system record of clearing)
+apiRouter.delete('/admin/activity-logs/clear', requireAdmin, async (req: AdminAuthRequest, res: Response) => {
+  try {
+    const adminEmail = req.admin?.email || 'admin@popularvote.id';
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+
+    // Delete existing logs
+    await db.delete(auditLogs);
+
+    // Record that logs were cleared
+    await logAdminAction({
+      adminEmail,
+      action: 'CLEAR_ACTIVITY_LOGS',
+      targetEntity: 'AUDIT_LOGS',
+      targetId: 'all',
+      details: 'Administrator membersihkan seluruh riwayat Activity Logs',
+      ipAddress: clientIp,
+    });
+
+    res.json({ success: true, message: 'Riwayat activity logs berhasil dibersihkan' });
+  } catch (err: any) {
+    console.error('Error clearing activity logs:', err);
+    res.status(500).json({ error: 'Gagal membersihkan log aktivitas' });
   }
 });

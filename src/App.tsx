@@ -28,6 +28,7 @@ import { AdminReports } from './admin/AdminReports.tsx';
 import { AdminCMS } from './admin/AdminCMS.tsx';
 import { AdminSettings } from './admin/AdminSettings.tsx';
 import { AdminSecurity } from './admin/AdminSecurity.tsx';
+import { AdminActivityLogs } from './admin/AdminActivityLogs.tsx';
 
 import { AdminUser } from './types/index.ts';
 import { apiRequest, getAdminToken, removeAdminToken } from './api/client.ts';
@@ -113,6 +114,7 @@ export default function App() {
         {adminSection === 'candidates' && <AdminCandidates />}
         {adminSection === 'packages' && <AdminVotePackages />}
         {adminSection === 'votes' && <AdminVotesAudit />}
+        {adminSection === 'activity-logs' && <AdminActivityLogs />}
         {adminSection === 'transactions' && <AdminTransactions />}
         {adminSection === 'winners' && <AdminWinners />}
         {adminSection === 'reports' && <AdminReports />}

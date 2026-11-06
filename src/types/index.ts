@@ -153,3 +153,18 @@ export interface AuditLogItem {
   ipAddress?: string | null;
   createdAt: string;
 }
+
+export interface EnvironmentSyncInfo {
+  nodeEnv: string;
+  dbHostType: string;
+  dbName: string;
+  serverTime: string;
+  appUrl: string;
+  uptimeSeconds: number;
+}
+
+export interface ActivityLogsResponse {
+  environment: EnvironmentSyncInfo;
+  logs: AuditLogItem[];
+  total: number;
+}
